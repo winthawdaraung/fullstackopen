@@ -14,10 +14,6 @@ const getAll = () => {
                 .then(res => res.data)
 }
 
-const getPerson = (id) => {
-    return axios.get(`${baseUrl}/${id}`)
-                .then(res => res.data)
-}
 
 const deletePerson = (id) => {
     return axios.delete(`${baseUrl}/${id}`)
@@ -29,4 +25,4 @@ const updatePerson = (id, newData) => {
                 .then(res => res.data)
 }
 
-export {addPerson, getAll, deletePerson, getPerson, updatePerson}
+export {addPerson, getAll, deletePerson, updatePerson}

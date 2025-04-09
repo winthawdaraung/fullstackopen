@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAll, addPerson, deletePerson, getPerson, updatePerson } from './handle'
+import { getAll, addPerson, deletePerson, updatePerson } from './handle'
 
 const PersonForm = ({handleSubmit, handleNameChange, handleNumChange, newName, newNumber}) => {
   return (
@@ -19,10 +19,9 @@ const Filter =  ({onFilter}) => {
   )}
 
 const Display = ({persons, filter, handleDel}) => {
-  // console.log("debug display",persons);
   const toDisplay = (filter !== '') 
-  ?persons.filter(person => person.name.toLowerCase().includes(filter.toLowerCase()))
-  :persons
+  ? persons.filter(person => person.name.toLowerCase().includes(filter.toLowerCase()))
+  : persons
   return (
     <div>
       {toDisplay.map((person, index) => (
@@ -56,43 +55,57 @@ const App = () => {
 
   useEffect(() => {
     console.log('effect');
-    getAll().then(res => setPersons(res))
-    .catch(err => console.log(err))
+    getAll()
+      .then(res => setPersons(res))
+      .catch(error => {
+        setMessage(`Error: ${error.message}`);
+        setType('error');
+        console.log(error);
+      });
   }, [])
 
   const addNewPerson = (newPerson) => {
     console.log('Add');
-    addPerson(newPerson).then(res => {
-      setPersons(persons.concat(res));
-      setMessage(`Added ${newPerson.name}!`);
-      setType('success');
-    })
-    .catch(err => console.log(err))
+    addPerson(newPerson)
+      .then(res => {
+        setPersons(persons.concat(res));
+        setMessage(`Added ${newPerson.name}!`);
+        setType('success');
+      })
+      .catch(error => {
+        setMessage(`Error adding ${newPerson.name}: ${error.message}`);
+        setType('error');
+        console.log(error);
+      });
   }
 
   const delPerson = (id) => {
-    getPerson(id)
-      .then(res => {
-        const name = res.name;
-        if (window.confirm(`Delete ${name}?`)) {
-          deletePerson(id)
-            .then(() => {
-              setPersons(persons.filter(person => person.id !== id));
-              setMessage(`Deleted ${name}!`);
-              setType('success');
-            })
-            .catch(err => {
-              setMessage(`Error: ${err.message}`);
-              setType('error');
-              console.log(err);
-            });
-        }
-      })
-      .catch(err => {
-        setMessage(`Error: ${err.message}`);
-        setType('error');
-        console.log("it's errror",err);
-      });
+    const personToDelete = persons.find(person => person.id === id);
+    
+    if (!personToDelete) {
+      setMessage("This person doesn't exist anymore");
+      setType('error');
+      return;
+    }
+    
+    if (window.confirm(`Delete ${personToDelete.name}?`)) {
+      deletePerson(id)
+        .then(() => {
+          setPersons(persons.filter(person => person.id !== id));
+          setMessage(`Deleted ${personToDelete.name}!`);
+          setType('success');
+        })
+        .catch(error => {
+          if (error.response && error.response.status === 404) {
+            // Person was already deleted from server
+            setMessage(`Information of ${personToDelete.name} has already been removed from server`);
+            setPersons(persons.filter(p => p.id !== id)); 
+          } else {
+            setMessage(`Error deleting ${personToDelete.name}: ${error.message}`);
+          }
+          setType('error');
+        });
+    }
   }
 
   const handleSubmit = (e) => {
@@ -101,26 +114,41 @@ const App = () => {
     console.log(nameExist);
     if (nameExist) {
       if (window.confirm(`"${newName}" is already added to phonebook, replace the old number with new one?`)) {
-          const old = persons.find(person => person.name === newName);
-          const updatedPerson = {...old, "number": newNumber};
-          updatePerson(old.id, updatedPerson)
+        const old = persons.find(person => person.name === newName);
+        const updatedPerson = {...old, "number": newNumber};
+        
+        updatePerson(old.id, updatedPerson)
           .then(res => {
-            setPersons(persons.map(person => person.id === old.id ?res :person))
+            setPersons(persons.map(person => person.id === old.id ? res : person));
             setMessage(`Updated ${updatedPerson.name}!`);
             setType('success');
+          })
+          .catch(error => {
+            if (error.response && error.response.status === 404) {
+              // Person no longer exists in the database
+              setMessage(`Information of ${updatedPerson.name} has already been removed from server`);
+              setType('error');
+              // Remove the person from the local state as well
+              setPersons(persons.filter(person => person.id !== old.id));
+            } else {
+              setMessage(`Error updating ${updatedPerson.name}: ${error.message}`);
+              setType('error');
+            }
           });
       }
       setNewName('');
       setNewNumber('');
-      return
+      return;
     }
+    
     const newPerson = {
-      name: newName, number: newNumber, id: (persons.length + 1).toString()
+      name: newName, 
+      number: newNumber, 
+      id: (persons.length + 1).toString()
     }
-    // setPersons(persons.concat(newPerson));
+    
     addNewPerson(newPerson);
     setNewName('');
-    // console.log("debug:", newName);
     setNewNumber('');
   }
 
@@ -135,6 +163,7 @@ const App = () => {
   const filterOn = (e) => {
     setFilter(e.target.value);
   }
+  
   return (
     <div>
       <h2>Phonebook</h2>
@@ -142,10 +171,12 @@ const App = () => {
       <Filter onFilter={filterOn}/>
       <h2>add a new</h2>
       <PersonForm 
-      handleSubmit={handleSubmit} 
-      handleNameChange={handleNameChange} 
-      handleNumChange={handleNumChange} 
-      newName={newName} newNumber={newNumber}/>
+        handleSubmit={handleSubmit} 
+        handleNameChange={handleNameChange} 
+        handleNumChange={handleNumChange} 
+        newName={newName} 
+        newNumber={newNumber}
+      />
       <h2>Numbers</h2>
       <Display persons={persons} filter={filter} handleDel={delPerson}/>
     </div>
