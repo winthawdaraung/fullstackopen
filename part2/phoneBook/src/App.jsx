@@ -32,11 +32,27 @@ const Display = ({persons, filter, handleDel}) => {
   )
 }
 
+const AlertMsg = ({ alertType, msg }) => {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (msg) {
+      setVisible(true);
+      const timer = setTimeout(() => setVisible(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [msg]);
+
+  return visible ? <div className={alertType}>{msg}</div> : null;
+}
+
 const App = () => {
   const [persons, setPersons] = useState([])
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
   const [filter, setFilter] = useState('');
+  const [msg, setMessage] = useState('');
+  const [alertType, setType] = useState('');
 
   useEffect(() => {
     console.log('effect');
@@ -46,19 +62,37 @@ const App = () => {
 
   const addNewPerson = (newPerson) => {
     console.log('Add');
-    addPerson(newPerson).then(res => setPersons(persons.concat(res)))
+    addPerson(newPerson).then(res => {
+      setPersons(persons.concat(res));
+      setMessage(`Added ${newPerson.name}!`);
+      setType('success');
+    })
     .catch(err => console.log(err))
   }
 
   const delPerson = (id) => {
-    const name = getPerson(id).name;
-
-    if (window.confirm(`Delete ${name}?`))
-      deletePerson(id)
-        .then(() => {
-          setPersons(persons.filter(person => person.id !== id));
-        })
-        .catch(err => console.log(err));
+    getPerson(id)
+      .then(res => {
+        const name = res.name;
+        if (window.confirm(`Delete ${name}?`)) {
+          deletePerson(id)
+            .then(() => {
+              setPersons(persons.filter(person => person.id !== id));
+              setMessage(`Deleted ${name}!`);
+              setType('success');
+            })
+            .catch(err => {
+              setMessage(`Error: ${err.message}`);
+              setType('error');
+              console.log(err);
+            });
+        }
+      })
+      .catch(err => {
+        setMessage(`Error: ${err.message}`);
+        setType('error');
+        console.log("it's errror",err);
+      });
   }
 
   const handleSubmit = (e) => {
@@ -70,9 +104,11 @@ const App = () => {
           const old = persons.find(person => person.name === newName);
           const updatedPerson = {...old, "number": newNumber};
           updatePerson(old.id, updatedPerson)
-          .then(res => {setPersons(persons.map(person => person.id === old.id 
-                                                        ?res :person
-          ))});
+          .then(res => {
+            setPersons(persons.map(person => person.id === old.id ?res :person))
+            setMessage(`Updated ${updatedPerson.name}!`);
+            setType('success');
+          });
       }
       setNewName('');
       setNewNumber('');
@@ -102,6 +138,7 @@ const App = () => {
   return (
     <div>
       <h2>Phonebook</h2>
+      <AlertMsg alertType={alertType} msg={msg}/>
       <Filter onFilter={filterOn}/>
       <h2>add a new</h2>
       <PersonForm 
